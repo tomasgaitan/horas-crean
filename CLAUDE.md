@@ -53,6 +53,15 @@ MVP funcional con backend en Google Sheets (Apps Script). Build y tests en verde
 - `src/lib/constants.ts`: constantes (sin números/strings mágicos).
 - `src/components/`: CurrentDate, Numpad, DniEntry, TimePicker, ConfirmacionFichaje, FichajeOverlay, ModalInconsistencia, PinGate, AltaProfesional, LoadingOverlay, ErrorScreen.
 
+## Kiosco / PWA
+- La app es una **PWA instalable** (manifest en `public/manifest.webmanifest`, meta tags en `index.html`).
+- `display: fullscreen` → al instalarla ("⋮ → Instalar app" en Chrome Android), se abre sin barra del navegador.
+- **NO** se fuerza la orientación (se sacó `orientation`): respeta cómo esté la tablet. El layout es responsive (vertical u horizontal).
+- Íconos generados desde `public/icon.svg` (reloj blanco sobre emerald): `icon-192/512/180.png`. Para regenerarlos: `qlmanage -t -s 1024 -o /tmp public/icon.svg` y luego `magick` a 512/192/180 (ImageMagick solo no renderiza el `stroke` del SVG; por eso se usa qlmanage).
+- Tras cambiar el manifest, la PWA instalada hay que **reinstalarla** para que tome los cambios.
+- Para kiosco blindado en Android (no salir, arranque al boot): Fully Kiosk Browser apuntando a la URL de producción.
+- URL de producción: `https://profesionales-crean.vercel.app`.
+
 ## Notas / contexto extra
 - El teclado físico funciona en desarrollo (0-9, Backspace, Enter).
 - `user-scalable=no` previene zoom en tablet; inputs de texto (alta) permiten edición/selección por excepción en `index.css`.
