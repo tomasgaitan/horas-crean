@@ -1,0 +1,39 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Build
+dist
+dist-ssr
+*.local
+.vite
+
+# Artefactos de tsc -b (emitidos al compilar; no se trackean)
+*.tsbuildinfo
+/vite.config.js
+/vite.config.d.ts
+
+# Config local de Claude Code (personal)
+.claude/settings.local.json
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
