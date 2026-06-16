@@ -8,42 +8,50 @@ Personal
 
 ## Stack usado en este proyecto
 - Frontend: Vite + React + TypeScript + Tailwind CSS
-- Persistencia: localStorage (MVP), aislada en `src/lib/storage.ts`
+- Backend / persistencia: Google Apps Script (web app) sobre Google Sheets — fuente de verdad. Aislado en `src/services/api.ts`.
 - Librerías: framer-motion, @phosphor-icons/react, dayjs (+ plugins utc/timezone/customParseFormat)
 - Tests: Vitest
 
 ## Proyectos relacionados
 Ninguno
 
+## Backend (Apps Script + Sheet)
+- Código del backend: `apps-script/Code.gs`. La hoja es la fuente de verdad (profesionales + fichajes).
+- Hoja `fichajes`: `profesional | dni | fecha | hora_ingreso | hora_egreso` (una fila por sesión: ingreso crea la fila, egreso la completa).
+- Hoja `profesionales`: `dni | nombre | apellido | activo`.
+- La URL del web app y el Sheet ID NO van en el repo (es público): viven en `VITE_APPS_SCRIPT_URL` (`.env` local + env var de Vercel) y en la memoria privada del proyecto. En `Code.gs`, `SHEET_ID` se deja vacío en el repo.
+- Acciones del backend (todo por GET): `estado`, `ingreso`, `egreso`, `alta`, `profesionales`.
+- Al cambiar `Code.gs`: re-deployar con "Nueva versión" para mantener la misma URL `/exec`.
+
 ## Estado actual
-MVP funcional con persistencia en localStorage. Build y tests en verde. Pendiente: migrar a backend real cuando se defina, y fase de pulido visual.
+MVP funcional con backend en Google Sheets (Apps Script). Build y tests en verde. Deploy en Vercel con auto-deploy por push. Pendiente: fase de pulido visual.
 
 ## Decisiones tomadas
 - **Identificación por DNI** en numpad propio (sin teclado nativo en la pantalla pública).
 - **Detección automática de tipo**: alterna ingreso/egreso; nunca dos iguales seguidos.
 - **Reseteo diario con aviso**: cada día arranca esperando ingreso. Un ingreso de un día anterior sin egreso es una inconsistencia que se resuelve (registrando el egreso faltante) antes de fichar hoy. Soporta varios pares ingreso/egreso dentro del mismo día.
-- **Edición de hora libre**: el TimePicker arranca en la hora actual y permite cualquier HH:MM (steppers con press-and-hold, granularidad 1 minuto). Validación blanda: el egreso no puede ser anterior al ingreso del día.
+- **Edición de hora libre**: el TimePicker arranca en la hora actual (redondeada al múltiplo de 5) y permite cualquier HH:MM; los minutos saltan de a 5 (steppers con press-and-hold). Validación blanda: el egreso no puede ser anterior al ingreso del día.
 - **Alta de profesionales protegida por PIN** (seguridad liviana de kiosco, no criptográfica). PIN default `1234`, configurable con `VITE_DEFAULT_PIN`.
-- **Sin vista/exportación de fichajes** por ahora: solo se persisten.
-- **Capa de datos aislada** (`storage.ts`) para migrar a Supabase/Apps Script sin tocar la UI.
-- **Lógica pura separada** (`fichaje.ts`, sin Date ni storage) → testeable; tests en `fichaje.test.ts`.
+- **Datos a Google Sheets**: los fichajes y profesionales viven en la hoja (fuente de verdad). La app es async, con estados de carga y error. No hay visor de datos in-app: se consultan en la planilla.
+- **Capa de red aislada** (`src/services/api.ts`) — única frontera con el backend; migrar a otro backend = reescribir ese archivo.
+- **Lógica pura separada** (`fichaje.ts`, sin Date ni red) → testeable; tests en `fichaje.test.ts`.
 - **Timezone** America/Argentina/Buenos_Aires en `src/lib/dayjs.ts`.
-- **Schema**: fecha (DD/MM/YYYY) y hora (HH:MM) en campos separados; `createdAt` (ISO) como orden canónico.
+- **Schema**: una fila por sesión (`hora_ingreso` + `hora_egreso`), fecha (DD/MM/YYYY) y horas (HH:MM) como texto en la hoja.
 - **DNI**: solo numérico, 6 a 8 dígitos, único.
-- **Diseño**: skill `design-taste-frontend` con dials ajustados al kiosco (VARIANCE 5 / MOTION 6 / DENSITY 3). Dark mode (zinc-950), Outfit + JetBrains Mono, acento emerald; semántica emerald=ingreso, amber=egreso, rose=error.
+- **Diseño**: skill `design-taste-frontend` con dials ajustados al kiosco (VARIANCE 5 / MOTION 6 / DENSITY 3). Light mode (fondo blanco), Outfit + JetBrains Mono, acento emerald; semántica emerald=ingreso, amber=egreso, rose=error.
 
 ## Próximos pasos
-- Conectar backend real (Supabase o Apps Script) reimplementando `storage.ts`.
-- Eventual vista/exportación CSV de fichajes (detrás del PIN).
+- Eventual vista/exportación de fichajes (la data ya está en la hoja).
 - Pulido visual final.
 
 ## Archivos clave
-- `src/App.tsx`: máquina de estados (dni / inconsistencia / confirmacion / overlay / pin / admin).
-- `src/lib/storage.ts`: repositorio localStorage (frontera de persistencia).
-- `src/lib/fichaje.ts`: lógica pura (detección de tipo, inconsistencia, validaciones).
+- `src/App.tsx`: máquina de estados async (dni / inconsistencia / confirmacion / overlay / pin / admin / error) + overlay de carga.
+- `src/services/api.ts`: capa de red al Apps Script (frontera de persistencia).
+- `apps-script/Code.gs`: backend (web app sobre Sheets).
+- `src/lib/fichaje.ts`: lógica pura (resolverAccion + validaciones).
 - `src/lib/dayjs.ts`: dayjs con timezone AR.
 - `src/lib/constants.ts`: constantes (sin números/strings mágicos).
-- `src/components/`: Clock, Numpad, DniEntry, TimePicker, ConfirmacionFichaje, FichajeOverlay, ModalInconsistencia, PinGate, AltaProfesional.
+- `src/components/`: CurrentDate, Numpad, DniEntry, TimePicker, ConfirmacionFichaje, FichajeOverlay, ModalInconsistencia, PinGate, AltaProfesional, LoadingOverlay, ErrorScreen.
 
 ## Notas / contexto extra
 - El teclado físico funciona en desarrollo (0-9, Backspace, Enter).

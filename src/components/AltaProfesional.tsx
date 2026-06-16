@@ -1,47 +1,70 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ArrowLeft, CheckCircle, UserPlus, Warning } from '@phosphor-icons/react'
+import { ArrowLeft, CheckCircle, CircleNotch, UserPlus, Warning } from '@phosphor-icons/react'
 import { validarProfesionalNuevo } from '../lib/fichaje'
+import { ApiError } from '../services/api'
 import { DNI_MAX_LENGTH, NOMBRE_MAX_LENGTH } from '../lib/constants'
-import type { Profesional } from '../types'
+import type { ProfesionalLista } from '../services/api'
+
+interface DatosProfesional {
+  dni: string
+  nombre: string
+  apellido: string
+}
 
 interface AltaProfesionalProps {
-  profesionales: Profesional[]
-  onAdd: (profesional: Profesional) => void
+  profesionales: ProfesionalLista[]
+  cargando: boolean
+  /** Da de alta; rechaza (throw) con ApiError si el backend devuelve error. */
+  onAdd: (datos: DatosProfesional) => Promise<void>
   onBack: () => void
 }
 
-export default function AltaProfesional({ profesionales, onAdd, onBack }: AltaProfesionalProps) {
+export default function AltaProfesional({
+  profesionales,
+  cargando,
+  onAdd,
+  onBack,
+}: AltaProfesionalProps) {
   const [nombre, setNombre] = useState('')
   const [apellido, setApellido] = useState('')
   const [dni, setDni] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [exito, setExito] = useState<string | null>(null)
+  const [enviando, setEnviando] = useState(false)
 
-  const activos = profesionales.filter((p) => p.activo)
-
-  function submit(event: React.FormEvent) {
+  async function submit(event: React.FormEvent) {
     event.preventDefault()
-    const yaExiste = profesionales.some((p) => p.dni === dni.trim())
-    const validacion = validarProfesionalNuevo(nombre, apellido, dni.trim(), yaExiste)
+    if (enviando) return
+
+    const validacion = validarProfesionalNuevo(nombre, apellido, dni.trim())
     if (!validacion.ok) {
       setError(validacion.error ?? 'Datos inválidos')
       setExito(null)
       return
     }
 
-    const nuevo: Profesional = {
+    const datos: DatosProfesional = {
       dni: dni.trim(),
       nombre: nombre.trim(),
       apellido: apellido.trim(),
-      activo: true,
     }
-    onAdd(nuevo)
-    setExito(`${nuevo.nombre} ${nuevo.apellido} agregado`)
+
+    setEnviando(true)
     setError(null)
-    setNombre('')
-    setApellido('')
-    setDni('')
+    try {
+      await onAdd(datos)
+      setExito(`${datos.nombre} ${datos.apellido} agregado`)
+      setNombre('')
+      setApellido('')
+      setDni('')
+    } catch (err) {
+      const mensaje = err instanceof ApiError ? err.message : 'No se pudo agregar el profesional'
+      setError(mensaje)
+      setExito(null)
+    } finally {
+      setEnviando(false)
+    }
   }
 
   return (
@@ -55,7 +78,9 @@ export default function AltaProfesional({ profesionales, onAdd, onBack }: AltaPr
           <ArrowLeft className="h-5 w-5" />
           Volver al kiosco
         </button>
-        <span className="text-sm text-zinc-500">{activos.length} profesionales activos</span>
+        <span className="text-sm text-zinc-500">
+          {cargando ? 'Cargando…' : `${profesionales.length} profesionales activos`}
+        </span>
       </header>
 
       <div className="flex flex-col gap-2">
@@ -146,16 +171,21 @@ export default function AltaProfesional({ profesionales, onAdd, onBack }: AltaPr
 
         <motion.button
           type="submit"
-          whileTap={{ scale: 0.98, y: 1 }}
+          disabled={enviando}
+          whileTap={enviando ? undefined : { scale: 0.98, y: 1 }}
           transition={{ type: 'spring', stiffness: 420, damping: 28 }}
-          className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-6 py-4 text-lg font-semibold text-emerald-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] active:brightness-95"
+          className="flex items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-6 py-4 text-lg font-semibold text-emerald-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)] active:brightness-95 disabled:opacity-50"
         >
-          <UserPlus weight="bold" className="h-5 w-5" />
-          Agregar
+          {enviando ? (
+            <CircleNotch weight="bold" className="h-5 w-5 animate-spin" />
+          ) : (
+            <UserPlus weight="bold" className="h-5 w-5" />
+          )}
+          {enviando ? 'Agregando…' : 'Agregar'}
         </motion.button>
       </form>
 
-      <ListaProfesionales profesionales={activos} />
+      <ListaProfesionales profesionales={profesionales} cargando={cargando} />
     </div>
   )
 }
@@ -163,7 +193,22 @@ export default function AltaProfesional({ profesionales, onAdd, onBack }: AltaPr
 const INPUT_CLASS =
   'h-14 rounded-2xl border border-zinc-200 bg-white px-4 text-xl text-zinc-900 placeholder:text-zinc-300 outline-none transition-colors focus:border-emerald-500'
 
-function ListaProfesionales({ profesionales }: { profesionales: Profesional[] }) {
+function ListaProfesionales({
+  profesionales,
+  cargando,
+}: {
+  profesionales: ProfesionalLista[]
+  cargando: boolean
+}) {
+  if (cargando) {
+    return (
+      <div className="flex items-center justify-center gap-2 rounded-2xl border border-zinc-200 p-6 text-sm text-zinc-500">
+        <CircleNotch weight="bold" className="h-4 w-4 animate-spin" />
+        Cargando profesionales…
+      </div>
+    )
+  }
+
   if (profesionales.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500">

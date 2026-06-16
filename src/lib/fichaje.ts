@@ -1,7 +1,7 @@
-// Lógica de dominio pura: detección de tipo de fichaje, inconsistencias y
-// validaciones. Sin dependencias de storage, red ni `Date` → 100% testeable.
+// Lógica de dominio pura: detección de la próxima acción y validaciones.
+// Sin dependencias de red, storage ni `Date` → 100% testeable.
 
-import type { Fichaje, Profesional, TipoFichaje } from '../types'
+import type { SesionAbierta } from '../services/api'
 import { DNI_MAX_LENGTH, DNI_MIN_LENGTH, NOMBRE_MAX_LENGTH } from './constants'
 
 export interface Validacion {
@@ -30,58 +30,37 @@ export function validarNombre(valor: string, campo: 'Nombre' | 'Apellido'): Vali
   return OK
 }
 
-export function validarProfesionalNuevo(
-  nombre: string,
-  apellido: string,
-  dni: string,
-  dniYaExiste: boolean,
-): Validacion {
+/** Valida el formato de un profesional nuevo. El duplicado de DNI lo decide el backend. */
+export function validarProfesionalNuevo(nombre: string, apellido: string, dni: string): Validacion {
   const vNombre = validarNombre(nombre, 'Nombre')
   if (!vNombre.ok) return vNombre
   const vApellido = validarNombre(apellido, 'Apellido')
   if (!vApellido.ok) return vApellido
-  const vDni = validarDni(dni)
-  if (!vDni.ok) return vDni
-  if (dniYaExiste) return { ok: false, error: 'Ya hay un profesional con ese DNI' }
-  return OK
+  return validarDni(dni)
 }
 
-// --- Detección de tipo e inconsistencias -------------------------------------
+// --- Próxima acción ----------------------------------------------------------
+
+export type ProximaAccion =
+  | { tipo: 'ingreso' }
+  | { tipo: 'egreso'; horaIngreso: string }
+  | { tipo: 'inconsistencia'; fecha: string; horaIngreso: string }
 
 /**
- * Inconsistencia = un ingreso de un día anterior que quedó sin su egreso.
- * Como dentro de un mismo día los fichajes alternan ingreso/egreso, el único
- * estado "abierto" posible es que el último fichaje sea un ingreso; si además
- * es de otro día, hay que resolverlo antes de fichar hoy.
+ * Determina qué corresponde hacer a partir de la sesión abierta del profesional:
+ * - sin sesión abierta → ingreso (fila nueva)
+ * - sesión abierta de hoy → egreso (completa la fila)
+ * - sesión abierta de otro día → inconsistencia (cerrar ese egreso pasado primero)
  *
- * @param fichajes fichajes del profesional, ordenados ascendentemente por createdAt.
+ * @param abierta sesión abierta del profesional (o null).
  * @param fechaHoy fecha actual en formato DD/MM/YYYY.
  */
-export function detectarInconsistencia(fichajes: Fichaje[], fechaHoy: string): Fichaje | null {
-  const ultimo = fichajes.at(-1)
-  if (!ultimo) return null
-  if (ultimo.tipo === 'ingreso' && ultimo.fecha !== fechaHoy) return ultimo
-  return null
-}
-
-/**
- * Tipo que corresponde al próximo fichaje. Debe llamarse sólo cuando NO hay
- * inconsistencia pendiente (resolverla primero). Si el último fichaje es un
- * ingreso (necesariamente de hoy), toca egreso; en cualquier otro caso, ingreso.
- */
-export function detectarProximoTipo(fichajes: Fichaje[]): TipoFichaje {
-  const ultimo = fichajes.at(-1)
-  if (!ultimo) return 'ingreso'
-  return ultimo.tipo === 'ingreso' ? 'egreso' : 'ingreso'
-}
-
-/**
- * Ingreso abierto del día (último fichaje si es un ingreso). Sirve para validar
- * que el egreso no sea anterior al ingreso correspondiente.
- */
-export function getIngresoAbierto(fichajes: Fichaje[]): Fichaje | null {
-  const ultimo = fichajes.at(-1)
-  return ultimo && ultimo.tipo === 'ingreso' ? ultimo : null
+export function resolverAccion(abierta: SesionAbierta | null, fechaHoy: string): ProximaAccion {
+  if (!abierta) return { tipo: 'ingreso' }
+  if (abierta.fecha !== fechaHoy) {
+    return { tipo: 'inconsistencia', fecha: abierta.fecha, horaIngreso: abierta.horaIngreso }
+  }
+  return { tipo: 'egreso', horaIngreso: abierta.horaIngreso }
 }
 
 // --- Comparación de horas ----------------------------------------------------
@@ -98,27 +77,4 @@ export function validarHoraEgreso(horaEgreso: string, horaIngreso: string): Vali
     return { ok: false, error: `El egreso no puede ser anterior al ingreso (${horaIngreso})` }
   }
   return OK
-}
-
-// --- Construcción de entidades -----------------------------------------------
-
-/** Crea un Fichaje a partir de datos puros (id y createdAt los provee el caller). */
-export function crearFichaje(
-  profesional: Profesional,
-  tipo: TipoFichaje,
-  fecha: string,
-  hora: string,
-  createdAt: string,
-  id: string,
-): Fichaje {
-  return {
-    id,
-    dni: profesional.dni,
-    nombre: profesional.nombre,
-    apellido: profesional.apellido,
-    fecha,
-    hora,
-    tipo,
-    createdAt,
-  }
 }

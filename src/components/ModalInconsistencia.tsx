@@ -3,12 +3,14 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { SignOut, Warning, X } from '@phosphor-icons/react'
 import TimePicker from './TimePicker'
 import { validarHoraEgreso } from '../lib/fichaje'
-import type { Fichaje, Profesional } from '../types'
+import type { Profesional } from '../types'
 
 interface ModalInconsistenciaProps {
   profesional: Profesional
-  /** Ingreso de un día anterior que quedó sin egreso. */
-  ingresoAbierto: Fichaje
+  /** Fecha del ingreso de un día anterior que quedó sin egreso (DD/MM/YYYY). */
+  fecha: string
+  /** Hora de ese ingreso abierto (HH:mm). */
+  horaIngreso: string
   /** Registra el egreso faltante para la fecha del ingreso abierto. */
   onConfirm: (hora: string) => void
   onCancel: () => void
@@ -16,11 +18,12 @@ interface ModalInconsistenciaProps {
 
 export default function ModalInconsistencia({
   profesional,
-  ingresoAbierto,
+  fecha,
+  horaIngreso,
   onConfirm,
   onCancel,
 }: ModalInconsistenciaProps) {
-  const [hora, setHora] = useState(ingresoAbierto.hora)
+  const [hora, setHora] = useState(horaIngreso)
   const [error, setError] = useState<string | null>(null)
 
   function cambiarHora(nueva: string) {
@@ -29,7 +32,7 @@ export default function ModalInconsistencia({
   }
 
   function confirmar() {
-    const v = validarHoraEgreso(hora, ingresoAbierto.hora)
+    const v = validarHoraEgreso(hora, horaIngreso)
     if (!v.ok) {
       setError(v.error ?? 'Hora inválida')
       return
@@ -54,9 +57,9 @@ export default function ModalInconsistencia({
           {profesional.nombre}, quedó un ingreso sin salida
         </h1>
         <p className="text-zinc-600">
-          El {ingresoAbierto.fecha} ingresaste a las{' '}
-          <span className="font-mono text-zinc-900">{ingresoAbierto.hora}</span> y no registraste el
-          egreso. Indicá a qué hora saliste ese día para continuar.
+          El {fecha} ingresaste a las{' '}
+          <span className="font-mono text-zinc-900">{horaIngreso}</span> y no registraste el egreso.
+          Indicá a qué hora saliste ese día para continuar.
         </p>
       </div>
 

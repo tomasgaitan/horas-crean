@@ -22,11 +22,5 @@ export const MINUTE_STEP = 5
 /** Duración del overlay de confirmación antes de volver a la pantalla inicial (ms). */
 export const OVERLAY_DURATION_MS = 2800
 
-export const STORAGE_KEYS = {
-  profesionales: 'hc_profesionales',
-  fichajes: 'hc_fichajes',
-  config: 'hc_config',
-} as const
-
 /** PIN por defecto si no se define VITE_DEFAULT_PIN. Seguridad liviana de kiosco. */
 export const DEFAULT_PIN = (import.meta.env.VITE_DEFAULT_PIN as string | undefined)?.trim() || '1234'
